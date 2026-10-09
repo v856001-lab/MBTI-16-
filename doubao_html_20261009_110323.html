@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MBTI 16型人格測試｜40題李克特完整版</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{box-sizing:border-box;font-family:system-ui, sans-serif;margin:0;padding:0;}
+body{background:#f4f7fa;color:#222;line-height:1.6;padding:16px;max-width:900px;margin:0 auto;}
+header{text-align:center;margin-bottom:24px;}
+h1{color:#334155;font-size:26px;margin-bottom:6px;}
+.desc{color:#64748b;margin-bottom:16px;}
+.box{background:#fff;padding:24px;border-radius:16px;box-shadow:0 4px 12px #00000010;margin-bottom:20px;}
+#startBox,#quizBox,#resultBox{display:none;}
+#startBox{display:block;}
+.question{margin-bottom:28px;}
+.q-title{font-weight:500;margin-bottom:12px;}
+.opt-group{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.opt{padding:8px 4px;border:1px solid #cbd5e1;border-radius:8px;text-align:center;cursor:pointer;font-size:14px;transition:0.2s;}
+.opt:hover{background:#f1f5f9;}
+.opt.selected{background:#2563eb;color:#fff;border-color:#2563eb;}
+button{width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:16px;cursor:pointer;margin-top:10px;}
+button:disabled{background:#94a3b8;cursor:not-allowed;}
+.type-name{font-size:32px;font-weight:bold;color:#2563eb;margin:12px 0;}
+.dim-wrap{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0;}
+.dim-item{background:#eef2ff;padding:8px 12px;border-radius:20px;font-size:14px;}
+.border-warning{background:#fff3cd;color:#856404;padding:10px;border-radius:8px;margin:12px 0;}
+.type-intro{background:#f8fafc;padding:16px;border-radius:10px;margin-top:16px;}
+.chart-wrap{width:100%;max-width:500px;margin:20px auto;}
+.remark{font-size:13px;color:#666;margin-top:16px;line-height:1.5;}
+.block{margin:10px 0;}
+.block h4{margin:8px 0;color:#2563eb;}
+@media(max-width:640px){
+  .opt-group{grid-template-columns:1fr 1fr;gap:8px;}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>MBTI 16型人格測試</h1>
+<p class="desc">40題李克特5點量表｜八邊形雷達圖｜僅供娛樂參考</p>
+</header>
+
+<div id="startBox" class="box">
+<h3>測驗說明</h3>
+<p style="margin:12px 0;">請依照<strong>日常放鬆狀態下真實的你</strong>作答，不要選擇理想中的自己、或是工作要求你表現的樣子。<br>答案沒有好壞對錯。</p>
+<ul style="padding-left:20px;margin:12px 0;">
+<li>非常符合：5分</li>
+<li>有點符合：4分</li>
+<li>中立：3分</li>
+<li>有點不符合：2分</li>
+<li>非常不符合：1分</li>
+</ul>
+<p class="remark">⚠️ 本測驗屬人格偏好問卷，不等同專業心理評估，不可做為徵才、心理疾病診斷使用。</p>
+<button id="startBtn">開始40題測驗</button>
+</div>
+
+<div id="quizBox" class="box">
+<div id="questionsWrap"></div>
+<button id="submitBtn" disabled>計算結果 & 產生八邊比分圖</button>
+</div>
+
+<div id="resultBox" class="box">
+<h2>你的MBTI測驗結果</h2>
+<div class="type-name" id="typeCode"></div>
+<div class="border-warning" id="warnBox" style="display:none;"></div>
+<div class="dim-wrap" id="dimWrap"></div>
+<div class="chart-wrap">
+<canvas id="radarChart"></canvas>
+</div>
+<div class="type-intro" id="typeIntro"></div>
+<p class="remark">備註：任一維度兩側差距小於10%視為邊界類型，人格傾向不穩定，重測可能得到不同結果。</p>
+<button id="restartBtn">重新測驗</button>
+</div>
+
+<script>
+// ========== 40題題庫：每維度10題，含正向/反向題 ==========
+const questions = [
+// ===== E/I (10題) =====
+{q:"聚會結束後，我通常感到精力充沛，想繼續聊天", dim:"EI", side:"E", reverse:false},
+{q:"我習慣遇到想法就直接找人討論，幫助自己理清思路", dim:"EI", side:"E", reverse:false},
+{q:"認識新朋友對我來說是一件輕鬆愉快的事", dim:"EI", side:"E", reverse:false},
+{q:"休閒時，我優先約朋友出門，而不是獨自活動", dim:"EI", side:"E", reverse:false},
+{q:"壓力大的時候，我會找人傾訴來舒緩情緒", dim:"EI", side:"E", reverse:false},
+{q:"長時間和人群相處後，我會感到疲憊需要獨處", dim:"EI", side:"I", reverse:true},
+{q:"我比較喜歡在腦內把想法完整想清楚，才和他人討論", dim:"EI", side:"I", reverse:true},
+{q:"陌生社交場合，我習慣保持安靜，等別人主動搭話", dim:"EI", side:"I", reverse:true},
+{q:"空閒時間，獨自看書或追劇對我是很好的休息", dim:"EI", side:"I", reverse:true},
+{q:"心情煩悶時，我習慣自己靜下調整，不願多傾訴", dim:"EI", side:"I", reverse:true},
+
+// ===== S/N (10題) =====
+{q:"我比較留意真實發生的具體細節，而不是抽象可能性", dim:"SN", side:"S", reverse:false},
+{q:"學習新知時，我偏好從實例、實務細節開始理解", dim:"SN", side:"S", reverse:false},
+{q:"聽別人敘述事情，我優先關注事實與細節", dim:"SN", side:"S", reverse:false},
+{q:"看說明書時，我習慣一步一步依照步驟操作", dim:"SN", side:"S", reverse:false},
+{q:"我比較相信親身經歷的經驗，勝過空泛的理論", dim:"SN", side:"S", reverse:false},
+{q:"我容易聯想到事件背後的潛在可能性與啟示", dim:"SN", side:"N", reverse:true},
+{q:"接觸新領域，我想先掌握整體概念再看細節", dim:"SN", side:"N", reverse:true},
+{q:"聽故事時，我更在意故事帶來的啟發與隱含意義", dim:"SN", side:"N", reverse:true},
+{q:"遇到問題，我習慣先猜原理，嘗試不同方法", dim:"SN", side:"N", reverse:true},
+{q:"我喜歡想像未來的各種可能性與不同劇本", dim:"SN", side:"N", reverse:true},
+
+// ===== T/F (10題) =====
+{q:"做決定時，我優先考量邏輯、利弊與客觀公平", dim:"TF", side:"T", reverse:false},
+{q:"團隊有爭議時，我習慣就事論事，分析問題本身", dim:"TF", side:"T", reverse:false},
+{q:"給他人建議時，我習慣直接指出問題，不刻意委婉", dim:"TF", side:"T", reverse:false},
+{q:"評估方案，我優先看效益與合理性", dim:"TF", side:"T", reverse:false},
+{q:"衝突當下，我認為道理比維持氣氛更重要", dim:"TF", side:"T", reverse:false},
+{q:"做決定前，我會仔細考量相關人的感受與關係和諧", dim:"TF", side:"F", reverse:true},
+{q:"團隊衝突，我優先修復人際關係，再處理事情", dim:"TF", side:"F", reverse:true},
+{q:"提出建議時，我會顧慮對方感受，委婉表達", dim:"TF", side:"F", reverse:true},
+{q:"評估方案，我會在意是否符合大家的期待", dim:"TF", side:"F", reverse:true},
+{q:"發生爭執，維持人際和睦對我很重要", dim:"TF", side:"F", reverse:true},
+
+// ===== J/P (10題) =====
+{q:"生活中我偏好預先規劃行程，不喜歡臨時變動", dim:"JP", side:"J", reverse:false},
+{q:"有截止日期的任務，我習慣提早完成，不拖到最後", dim:"JP", side:"J", reverse:false},
+{q:"我的生活空間，習慣維持整齊有序", dim:"JP", side:"J", reverse:false},
+{q:"假日活動，我會提前安排好行程", dim:"JP", side:"J", reverse:false},
+{q:"面對待辦事項，我希望全部確定、安排妥當", dim:"JP", side:"J", reverse:false},
+{q:"我喜歡保留彈性，不願被固定行程綁住", dim:"JP", side:"P", reverse:true},
+{q:"任務截止前，我常臨近期限才開始全力處理", dim:"JP", side:"P", reverse:true},
+{q:"我的生活環境偏向隨性自在，不強求整齊", dim:"JP", side:"P", reverse:true},
+{q:"假日比較喜歡當天隨興決定做什麼", dim:"JP", side:"P", reverse:true},
+{q:"待辦項目，我能接受保持開放，隨狀態調整", dim:"JP", side:"P", reverse:true},
+];
+
+// ========== 16人格完整資料：名稱｜簡介｜優點｜盲點｜適合職業｜感情觀 ==========
+const typeMap = {
+ISTJ:{
+name:"檢查官",
+intro:"務實、負責、守規則，重視穩定，擅長整理細節，可靠踏實。",
+good:"責任感極強、做事嚴謹守時、重視事實、穩定可靠、善於組織整理資料。",
+weak:"較保守，不容易接受突發改變；習慣按規則辦事，有時忽略他人感受。",
+job:"會計、行政、品保、工程師、後勤管理、檔案管理、法律助理。",
+love:"穩定長遠型，重視承諾；不善甜言蜜語，習慣用實際行動照顧伴侶。"
+},
+ISFJ:{
+name:"守護者",
+intro:"溫暖體貼、有責任感，樂於照顧他人，重視傳統與安全感。",
+good:"細心體貼、忠誠可靠、善於觀察他人需求、願意付出、有耐心。",
+weak:"容易過度犧牲自己；不喜歡衝突，有委屈習慣藏在心裡。",
+job:"護理師、社工、教師、秘書、客服、醫療助理、幼保。",
+love:"溫柔守護型，喜歡照顧對方；需要被肯定，害怕被忽略、被背叛。"
+},
+INFJ:{
+name:"提倡者",
+intro:"內斂有遠見，洞察力強，追求意義，理想主義，共情力高。",
+good:"洞察力強、共情力高、重視價值觀、有使命感、善於理解深層動機。",
+weak:"完美主義，容易內耗；很難信任他人，需要很深的精神共鳴。",
+job:"心理師、輔導員、作家、人文教育、策略顧問、藝術策展。",
+love:"靈魂伴侶取向，尋找精神契合；不接受淺薄、表面的關係。"
+},
+INTJ:{
+name:"建築師",
+intro:"戰略思考者，獨立理性，擅長長遠規劃，追求系統與效率。",
+good:"戰略思維、邏輯強、獨立、善於長遠規劃、解決複雜難題。",
+weak:"對人際繁文縟節不耐煩；標準很高，容易對他人缺乏耐心。",
+job:"研發工程師、策略規劃、架構師、數據分析、投資研究。",
+love:"重視心智同頻，不喜無意義社交；情感表達內斂，但承諾穩固。"
+},
+ISTP:{
+name:"鑑賞家",
+intro:"冷靜務實，動手能力強，喜歡拆解問題，隨機應變。",
+good:"動手能力強、冷靜臨機應變、務實、擅長故障排除、好奇心強。",
+weak:"不喜長期規劃；情緒表達簡短，容易被誤認為冷漠。",
+job:"機械工程、維修技師、工藝師、測試工程、運動教練。",
+love:"活在當下，不喜綁死的承諾；欣賞獨立、不黏人的伴侶。"
+},
+ISFP:{
+name:"探險家",
+intro:"溫柔敏感，注重當下感受，熱愛美與體驗，不喜歡束縛。",
+good:"感受力強、熱愛美、溫和包容、活在當下、真誠自然。",
+weak:"不喜抽象長遠規劃；害怕衝突，容易逃避壓力對話。",
+job:"設計、攝影、美術、手作、餐飲、園藝、表演藝術。",
+love:"重視氛圍與真實感受；討厭壓迫式關係，需要自由空間。"
+},
+INFP:{
+name:"調停者",
+intro:"理想浪漫，價值觀強，內心世界豐富，追求真誠。",
+good:"同理心強、忠於自我價值、想像力豐富、真誠溫柔。",
+weak:"理想與現實落差容易內耗；不喜衝突，容易拖延難題。",
+job:"寫作、藝術、心理諮詢、人文教學、創意策展。",
+love:"追求真摯、靈性的戀愛；極度討厭虛偽，需要被接納真實的自己。"
+},
+INTP:{
+name:"邏輯學家",
+intro:"好奇愛思考，熱愛理論，喜歡質疑與推演，隨性自由。",
+good:"邏輯推演強、好奇心旺盛、創意思辨、客觀開放。",
+weak:"不喜繁瑣例行事務；對時間、生活細節容易散漫。",
+job:"程式開發、研究、哲學、數理、系統架構、學術。",
+love:"喜歡心智交流，討厭制式戀愛流程；情感表達緩慢。"
+},
+ESTP:{
+name:"企業家",
+intro:"活力十足，擅長應變，喜歡挑戰，務實、活在當下。",
+good:"行動力強、擅長應變、務實、勇於嘗試、口才靈活。",
+weak:"容易不耐長遠枯燥計劃；追求刺激，有時忽略長期後果。",
+job:"業務、創業、活動策展、談判、銷售、運動教練。",
+love:"熱情直接，喜歡新體驗；不喜過度沉重、長期壓抑的關係。"
+},
+ESFP:{
+name:"表演者",
+intro:"熱情外向，擅長社交，喜歡帶給大家快樂，注重體驗。",
+good:"熱情活潑、擅長帶動氣氛、樂觀、體驗導向、善於察覺氛圍。",
+weak:"不喜抽象理論與長遠規劃；害怕負面衝突。",
+job:"演藝、活動主持、行銷、服務業、時尚、餐飲。",
+love:"喜歡一起體驗生活、玩樂；需要大量陪伴，討厭冷淡疏離。"
+},
+ENFP:{
+name:"競選者",
+intro:"熱情靈活，想像力豐富，樂觀，喜歡新可能性。",
+good:"創意豐富、樂觀熱情、善於鼓舞他人、想像力強。",
+weak:"熱度容易退散；想法很多，落實執行容易斷斷續續。",
+job:"創意行銷、教育、顧問、寫作、活動策劃。",
+love:"充滿浪漫驚喜，尋找有趣靈魂；討厭一成不變的死板關係。"
+},
+ENTP:{
+name:"辯論家",
+intro:"思維敏捷，喜歡思辨挑戰，創意多，樂於討論不同觀點。",
+good:"思維敏捷、創意多、擅辯、開放接受新想法、能快速抓重點。",
+weak:"有時候為辯而辯；容易厭倦重複例行工作。",
+job:"策略顧問、創業、律師、產品經理、研發。",
+love:"喜歡腦力碰撞；伴侶要能跟他辯論，不害怕不同想法。"
+},
+ESTJ:{
+name:"總經理",
+intro:"果斷務實，組織力強，重視規則與效率，善於帶領團隊。",
+good:"組織力強、果斷負責、重視效率、善於管理、講求公道。",
+weak:"有時過度依賴規則；較難共情脆弱情緒。",
+job:"企業管理、專案管理、行政主管、營運、軍公教管理職。",
+love:"重視責任與家庭承諾；習慣安排規劃，不喜失控混亂。"
+},
+ESFJ:{
+name:"執政官",
+intro:"友善熱心，照顧他人感受，重視人際和諧，樂於服務。",
+good:"熱心友善、善於維持人際、觀察他人需求、負責熱心。",
+weak:"太在意別人評價；害怕衝突，難以拒絕他人請求。",
+job:"公關、人力資源、教師、社群運營、客服、活動管理。",
+love:"熱心照顧伴侶，重視家庭儀式感；需要被肯定與認同。"
+},
+ENFJ:{
+name:"主人公",
+intro:"魅力領導，善於鼓勵他人，洞察人心，追求共同成長。",
+good:"善於鼓舞他人、共情強、領導魅力、重視價值觀、願意栽培別人。",
+weak:"習慣承擔他人情緒，容易耗竭；期待他人跟上自己標準。",
+job:"教育、培訓、心理輔導、人力、組織顧問。",
+love:"願意陪伴伴侶成長；尋找可以一起進步的夥伴。"
+},
+ENTJ:{
+name:"指揮官",
+intro:"果斷強勢，戰略導向，目標感強，擅長組織與推進任務。",
+good:"目標導向、戰略強、果斷、組織推進力強、不怕衝突。",
+weak:"有時候太直接，忽略他人情緒；不耐煩低效率。",
+job:"高階管理、創業、策略長、專案總監、投資。",
+love:"夥伴式戀愛，欣賞有能力的人；不喜黏人、沒有主見的伴侶。"
+},
+};
+
+const optLabels = ["非常不符合","有點不符合","中立","有點符合","非常符合"];
+const optValues = [1,2,3,4,5];
+
+const startBox = document.getElementById('startBox');
+const quizBox = document.getElementById('quizBox');
+const resultBox = document.getElementById('resultBox');
+const questionsWrap = document.getElementById('questionsWrap');
+const submitBtn = document.getElementById('submitBtn');
+const startBtn = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const typeCode = document.getElementById('typeCode');
+const dimWrap = document.getElementById('dimWrap');
+const warnBox = document.getElementById('warnBox');
+const typeIntro = document.getElementById('typeIntro');
+const canvas = document.getElementById('radarChart');
+let radarChart = null;
+
+let answers = Array(questions.length).fill(null);
+
+// 渲染40題
+function renderQuiz(){
+  questionsWrap.innerHTML = '';
+  answers.fill(null);
+  questions.forEach((item, idx)=>{
+    const div = document.createElement('div');
+    div.className = 'question';
+    div.innerHTML = `<div class="q-title">${idx+1}. ${item.q}</div>`;
+    const optWrap = document.createElement('div');
+    optWrap.className = 'opt-group';
+    optValues.forEach((score, oIdx)=>{
+      const optEl = document.createElement('div');
+      optEl.className = 'opt';
+      optEl.textContent = optLabels[oIdx];
+      optEl.dataset.idx = idx;
+      optEl.dataset.val = score;
+      optEl.onclick = ()=>{
+        document.querySelectorAll(`.opt[data-idx="${idx}"]`).forEach(e=>e.classList.remove('selected'));
+        optEl.classList.add('selected');
+        answers[idx] = Number(optEl.dataset.val);
+        submitBtn.disabled = answers.some(v=>v===null);
+      };
+      optWrap.appendChild(optEl);
+    });
+    div.appendChild(optWrap);
+    questionsWrap.appendChild(div);
+  });
+  submitBtn.disabled = true;
+}
+
+// 計算分數
+function calcScore(){
+  const score = {E:0,I:0,S:0,N:0,T:0,F:0,J:0,P:0};
+  questions.forEach((item, idx)=>{
+    let raw = answers[idx];
+    let s = raw;
+    if(item.reverse){
+      s = 6 - raw; // 反向題：1↔5,2↔4，3維持3
+    }
+    score[item.side] += s;
+  });
+  // 計算各維度百分比
+  const totalEI = score.E + score.I;
+  const totalSN = score.S + score.N;
+  const totalTF = score.T + score.F;
+  const totalJP = score.J + score.P;
+  const pct = {
+    E: (score.E/totalEI*100).toFixed(1),
+    I: (score.I/totalEI*100).toFixed(1),
+    S: (score.S/totalSN*100).toFixed(1),
+    N: (score.N/totalSN*100).toFixed(1),
+    T: (score.T/totalTF*100).toFixed(1),
+    F: (score.F/totalTF*100).toFixed(1),
+    J: (score.J/totalJP*100).toFixed(1),
+    P: (score.P/totalJP*100).toFixed(1),
+  };
+  // 判斷類型 + 邊界檢查
+  let code = "";
+  let warnList = [];
+  const diffEI = Math.abs(pct.E - pct.I);
+  const diffSN = Math.abs(pct.S - pct.N);
+  const diffTF = Math.abs(pct.T - pct.F);
+  const diffJP = Math.abs(pct.J - pct.P);
+  code += (pct.E >= pct.I) ? "E":"I";
+  code += (pct.S >= pct.N) ? "S":"N";
+  code += (pct.T >= pct.F) ? "T":"F";
+  code += (pct.J >= pct.P) ? "J":"P";
+  if(diffEI <10) warnList.push("E/I");
+  if(diffSN <10) warnList.push("S/N");
+  if(diffTF <10) warnList.push("T/F");
+  if(diffJP <10) warnList.push("J/P");
+  return {score,pct,code,warnList};
+}
+
+// 繪製八邊雷達圖
+function drawRadar(pct){
+  if(radarChart) radarChart.destroy();
+  const ctx = canvas.getContext('2d');
+  radarChart = new Chart(ctx,{
+    type:"radar",
+    data:{
+      labels:["E","I","S","N","T","F","J","P"],
+      datasets:[{
+        label:"人格傾向百分比",
+        data:[pct.E,pct.I,pct.S,pct.N,pct.T,pct.F,pct.J,pct.P],
+        backgroundColor:"rgba(37, 99, 235,0.2)",
+        borderColor:"rgba(37, 99, 235,1)",
+        pointBackgroundColor:"rgba(37, 99, 235,1)",
+      }]
+    },
+    options:{
+      scales:{
+        r:{min:0,max:100,ticks:{stepSize:20}}
+      }
+    }
+  });
+}
+
+function showResult(){
+  const res = calcScore();
+  const info = typeMap[res.code];
+  typeCode.textContent = `${res.code} ${info.name}`;
+  // 維度文字
+  dimWrap.innerHTML = `
+    <div class="dim-item">E:${res.pct.E}%｜I:${res.pct.I}%</div>
+    <div class="dim-item">S:${res.pct.S}%｜N:${res.pct.N}%</div>
+    <div class="dim-item">T:${res.pct.T}%｜F:${res.pct.F}%</div>
+    <div class="dim-item">J:${res.pct.J}%｜P:${res.pct.P}%</div>
+  `;
+  // 邊界警告
+  if(res.warnList.length>0){
+    warnBox.style.display="block";
+    warnBox.innerText = `⚠️ 邊界維度：${res.warnList.join("、")}，此部分傾向不明顯，重測有可能得到不同人格類型。`;
+  }else{
+    warnBox.style.display="none";
+  }
+  // 完整資訊
+  typeIntro.innerHTML = `
+  <div class="block"><strong>簡介：</strong>${info.intro}</div>
+  <div class="block"><h4>✅ 優點</h4>${info.good}</div>
+  <div class="block"><h4>⚠️ 盲點</h4>${info.weak}</div>
+  <div class="block"><h4>💼 適合職業</h4>${info.job}</div>
+  <div class="block"><h4>❤️ 感情觀</h4>${info.love}</div>
+  `;
+  drawRadar(res.pct);
+  quizBox.style.display='none';
+  resultBox.style.display='block';
+}
+
+startBtn.onclick = ()=>{
+  startBox.style.display='none';
+  quizBox.style.display='block';
+  renderQuiz();
+};
+submitBtn.onclick = showResult;
+restartBtn.onclick = ()=>{
+  resultBox.style.display='none';
+  startBox.style.display='block';
+};
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->
