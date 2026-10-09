@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大五人格簡測</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui, sans-serif;margin:0;padding:0;}
+body{background:#f4f7fa;color:#222;line-height:1.6;padding:16px;max-width:900px;margin:0 auto;}
+header{text-align:center;margin-bottom:24px;}
+h1{color:#334155;font-size:26px;margin-bottom:6px;}
+.desc{color:#64748b;margin-bottom:16px;}
+.box{background:#fff;padding:24px;border-radius:16px;box-shadow:0 4px 12px #00000010;margin-bottom:20px;}
+.question{margin-bottom:24px;}
+.q-title{font-weight:500;margin-bottom:10px;}
+.opt-group{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.opt{padding:8px 4px;border:1px solid #cbd5e1;border-radius:8px;text-align:center;cursor:pointer;font-size:14px;transition:0.2s;}
+.opt:hover{background:#f1f5f9;}
+.opt.selected{background:#2563eb;color:#fff;border-color:#2563eb;}
+button{width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:16px;cursor:pointer;margin-top:10px;}
+button:disabled{background:#94a3b8;cursor:not-allowed;}
+.secondary-btn{background:#64748b;margin-top:8px;}
+.share-link-area{margin-top:16px;}
+#shareUrl{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin:8px 0;}
+.copy-tip{color:#22c55e;font-size:14px;display:none;}
+.result-area{margin:20px 0;min-height:120px;padding:16px;background:#f8fafc;border-radius:10px;}
+@media(max-width:640px){.opt-group{grid-template-columns:1fr 1fr;gap:8px;}}
+@media print {
+  body {background:#fff;}
+  button, .share-link-area {display:none !important;}
+  .box {box-shadow:none; padding:0;}
+  .opt-group{display:none !important;}
+  .question{display:none !important;}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>大五人格簡測</h1>
+<p class="desc">簡易大五人格（OCEAN）測驗｜結果可列印與分享</p>
+</header>
+<div class="box">
+  <div id="gameArea">
+    <div id="questionsWrap"></div>
+    <button id="submitBtn" disabled>計算結果</button>
+  </div>
+  <div class="result-area" id="resultBox" style="display:none;">
+    <h3>你的大五人格測驗結果</h3>
+    <div id="resultText"></div>
+  </div>
+  <button id="printBtn">🖨️ 列印報告 / 另存PDF</button>
+  <div class="share-link-area">
+    <p>🔗 分享結果連結</p>
+    <input id="shareUrl" readonly>
+    <button id="copyLinkBtn" class="secondary-btn">複製連結</button>
+    <div class="copy-tip" id="copyTip">✅ 已複製到剪貼簿</div>
+  </div>
+  <button id="restartBtn">重新測驗</button>
+</div>
+<script>
+const printBtn = document.getElementById('printBtn');
+const shareUrlInput = document.getElementById('shareUrl');
+const copyLinkBtn = document.getElementById('copyLinkBtn');
+const copyTip = document.getElementById('copyTip');
+const restartBtn = document.getElementById('restartBtn');
+const resultBox = document.getElementById('resultBox');
+const resultText = document.getElementById('resultText');
+const questionsWrap = document.getElementById('questionsWrap');
+const submitBtn = document.getElementById('submitBtn');
+
+let currentResult = null;
+let answers = [];
+const optLabels = ["非常不符合","有點不符合","中立","有點符合","非常符合"];
+const optValues = [1,2,3,4,5];
+const questions = [
+  {q:"我喜歡嘗試新想法、新體驗",dim:"O"},
+  {q:"我做事有條理，重視規劃",dim:"C"},
+  {q:"我善於與人互動，外向熱絡",dim:"E"},
+  {q:"我體諒他人，容易相信別人",dim:"A"},
+  {q:"我容易緊張、情緒起伏較大",dim:"N"},
+  {q:"我對陌生觀念沒有太大興趣",dim:"O",rev:true},
+  {q:"我常常拖延，不太守時",dim:"C",rev:true},
+  {q:"獨處時我覺得比較放鬆",dim:"E",rev:true},
+  {q:"我會懷疑他人動機，比較謹慎",dim:"A",rev:true},
+  {q:"我情緒穩定，不容易焦慮",dim:"N",rev:true},
+];
+const dimName = {O:"開放性",C:"盡責性",E:"外向性",A:"親和性",N:"神經質"};
+
+printBtn.onclick = ()=> window.print();
+copyLinkBtn.onclick = async ()=>{
+  await navigator.clipboard.writeText(shareUrlInput.value);
+  copyTip.style.display = "block";
+  setTimeout(()=>copyTip.style.display="none",2000);
+};
+function buildShareUrl(res){
+  const payload = btoa(JSON.stringify(res));
+  const url = `${location.origin}${location.pathname}?r=${payload}`;
+  shareUrlInput.value = url;
+}
+function loadFromUrlParam(){
+  const params = new URLSearchParams(location.search);
+  const dataStr = params.get("r");
+  if(!dataStr) return;
+  try{
+    const json = JSON.parse(atob(dataStr));
+    renderResult(json);
+  }catch(e){console.log("無效連結");}
+}
+function renderResult(res){
+  currentResult = res;
+  resultBox.style.display="block";
+  resultText.innerHTML = res.html;
+  buildShareUrl(res);
+}
+function renderQuiz(){
+  questionsWrap.innerHTML = '';
+  answers = Array(questions.length).fill(null);
+  questions.forEach((item, idx)=>{
+    const div = document.createElement('div');
+    div.className = 'question';
+    div.innerHTML = `<div class="q-title">${idx+1}. ${item.q}</div>`;
+    const optWrap = document.createElement('div');
+    optWrap.className = 'opt-group';
+    optValues.forEach((score, oIdx)=>{
+      const optEl = document.createElement('div');
+      optEl.className = 'opt';
+      optEl.textContent = optLabels[oIdx];
+      optEl.dataset.idx = idx;
+      optEl.dataset.val = score;
+      optEl.onclick = ()=>{
+        document.querySelectorAll(`.opt[data-idx="${idx}"]`).forEach(e=>e.classList.remove('selected'));
+        optEl.classList.add('selected');
+        answers[idx] = Number(optEl.dataset.val);
+        submitBtn.disabled = answers.some(v=>v===null);
+      };
+      optWrap.appendChild(optEl);
+    });
+    div.appendChild(optWrap);
+    questionsWrap.appendChild(div);
+  });
+  submitBtn.disabled = true;
+}
+function calcScore(){
+  const s={O:0,C:0,E:0,A:0,N:0};
+  questions.forEach((q,idx)=>{
+    let v = answers[idx];
+    if(q.rev) v = 6 - v;
+    s[q.dim] += v;
+  });
+  const html = Object.entries(s).map(([k,v])=>`<p><strong>${dimName[k]}：${v}/25</strong></p>`).join("") + `<p>備註：簡化版大五人格測驗，僅供娛樂參考。</p>`;
+  return {html};
+}
+submitBtn.onclick = ()=>{renderResult(calcScore());};
+restartBtn.onclick = ()=>{
+  resultBox.style.display="none";
+  history.replaceState({}, document.title, location.pathname);
+  renderQuiz();
+};
+window.onload = ()=>{
+  loadFromUrlParam();
+  if(!currentResult) renderQuiz();
+};
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->

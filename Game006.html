@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>壓力自我評估量表</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui, sans-serif;margin:0;padding:0;}
+body{background:#f4f7fa;color:#222;line-height:1.6;padding:16px;max-width:900px;margin:0 auto;}
+header{text-align:center;margin-bottom:24px;}
+h1{color:#334155;font-size:26px;margin-bottom:6px;}
+.desc{color:#64748b;margin-bottom:16px;}
+.box{background:#fff;padding:24px;border-radius:16px;box-shadow:0 4px 12px #00000010;margin-bottom:20px;}
+.question{margin-bottom:24px;}
+.q-title{font-weight:500;margin-bottom:10px;}
+.opt-group{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.opt{padding:8px 4px;border:1px solid #cbd5e1;border-radius:8px;text-align:center;cursor:pointer;font-size:14px;transition:0.2s;}
+.opt:hover{background:#f1f5f9;}
+.opt.selected{background:#2563eb;color:#fff;border-color:#2563eb;}
+button{width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:16px;cursor:pointer;margin-top:10px;}
+button:disabled{background:#94a3b8;cursor:not-allowed;}
+.secondary-btn{background:#64748b;margin-top:8px;}
+.share-link-area{margin-top:16px;}
+#shareUrl{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin:8px 0;}
+.copy-tip{color:#22c55e;font-size:14px;display:none;}
+.result-area{margin:20px 0;min-height:120px;padding:16px;background:#f8fafc;border-radius:10px;}
+@media(max-width:640px){.opt-group{grid-template-columns:1fr 1fr;gap:8px;}}
+@media print {
+  body {background:#fff;}
+  button, .share-link-area {display:none !important;}
+  .box {box-shadow:none; padding:0;}
+  .opt-group{display:none !important;}
+  .question{display:none !important;}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>壓力自我評估量表</h1>
+<p class="desc">簡易壓力程度檢測｜結果可列印與分享</p>
+</header>
+<div class="box">
+  <div id="gameArea">
+    <div id="questionsWrap"></div>
+    <button id="submitBtn" disabled>計算結果</button>
+  </div>
+  <div class="result-area" id="resultBox" style="display:none;">
+    <h3>你的壓力自我評估結果</h3>
+    <div id="resultText"></div>
+  </div>
+  <button id="printBtn">🖨️ 列印報告 / 另存PDF</button>
+  <div class="share-link-area">
+    <p>🔗 分享結果連結</p>
+    <input id="shareUrl" readonly>
+    <button id="copyLinkBtn" class="secondary-btn">複製連結</button>
+    <div class="copy-tip" id="copyTip">✅ 已複製到剪貼簿</div>
+  </div>
+  <button id="restartBtn">重新測驗</button>
+</div>
+<script>
+const printBtn = document.getElementById('printBtn');
+const shareUrlInput = document.getElementById('shareUrl');
+const copyLinkBtn = document.getElementById('copyLinkBtn');
+const copyTip = document.getElementById('copyTip');
+const restartBtn = document.getElementById('restartBtn');
+const resultBox = document.getElementById('resultBox');
+const resultText = document.getElementById('resultText');
+const questionsWrap = document.getElementById('questionsWrap');
+const submitBtn = document.getElementById('submitBtn');
+
+let currentResult = null;
+let answers = [];
+const optLabels = ["從不","偶爾","有時","經常","總是"];
+const optValues = [1,2,3,4,5];
+const questions = [
+  {q:"我覺得事情太多，無法處理"},
+  {q:"容易緊張、煩躁，無法放鬆"},
+  {q:"睡眠變差，難入睡或早醒"},
+  {q:"容易疲勞、提不起精神"},
+  {q:"對很多事情失去興趣"},
+  {q:"容易因為小事生氣"},
+  {q:"擔心未來，常常焦慮"},
+  {q:"胃口改變（變大或沒食慾）"},
+];
+
+printBtn.onclick = ()=> window.print();
+copyLinkBtn.onclick = async ()=>{
+  await navigator.clipboard.writeText(shareUrlInput.value);
+  copyTip.style.display = "block";
+  setTimeout(()=>copyTip.style.display="none",2000);
+};
+function buildShareUrl(res){
+  const payload = btoa(JSON.stringify(res));
+  const url = `${location.origin}${location.pathname}?r=${payload}`;
+  shareUrlInput.value = url;
+}
+function loadFromUrlParam(){
+  const params = new URLSearchParams(location.search);
+  const dataStr = params.get("r");
+  if(!dataStr) return;
+  try{
+    const json = JSON.parse(atob(dataStr));
+    renderResult(json);
+  }catch(e){console.log("無效連結");}
+}
+function renderResult(res){
+  currentResult = res;
+  resultBox.style.display="block";
+  resultText.innerHTML = res.html;
+  buildShareUrl(res);
+}
+function renderQuiz(){
+  questionsWrap.innerHTML = '';
+  answers = Array(questions.length).fill(null);
+  questions.forEach((item, idx)=>{
+    const div = document.createElement('div');
+    div.className = 'question';
+    div.innerHTML = `<div class="q-title">${idx+1}. ${item.q}</div>`;
+    const optWrap = document.createElement('div');
+    optWrap.className = 'opt-group';
+    optValues.forEach((score, oIdx)=>{
+      const optEl = document.createElement('div');
+      optEl.className = 'opt';
+      optEl.textContent = optLabels[oIdx];
+      optEl.dataset.idx = idx;
+      optEl.dataset.val = score;
+      optEl.onclick = ()=>{
+        document.querySelectorAll(`.opt[data-idx="${idx}"]`).forEach(e=>e.classList.remove('selected'));
+        optEl.classList.add('selected');
+        answers[idx] = Number(optEl.dataset.val);
+        submitBtn.disabled = answers.some(v=>v===null);
+      };
+      optWrap.appendChild(optEl);
+    });
+    div.appendChild(optWrap);
+    questionsWrap.appendChild(div);
+  });
+  submitBtn.disabled = true;
+}
+function calcScore(){
+  const total = answers.reduce((a,b)=>a+b,0);
+  let level,desc;
+  if(total<=12){level="低壓力";desc:"目前壓力狀態平穩，維持現有作息即可。";}
+  else if(total<=20){level="輕度壓力";desc:"有輕微壓力，建議安排休息與運動。";}
+  else if(total<=28){level="中度壓力";desc:"壓力偏高，需要調整工作量、多放鬆。";}
+  else {level="高度壓力";desc:"壓力很高，建議尋求親友或專業人員協助。";}
+  const html = `<p><strong>總分：${total}｜壓力等級：${level}</strong></p><p>${desc}</p><p>備註：僅為簡易篩檢，不能取代專業醫師診斷。若長期不適請尋求專業協助。</p>`;
+  return {html};
+}
+submitBtn.onclick = ()=>{renderResult(calcScore());};
+restartBtn.onclick = ()=>{
+  resultBox.style.display="none";
+  history.replaceState({}, document.title, location.pathname);
+  renderQuiz();
+};
+window.onload = ()=>{
+  loadFromUrlParam();
+  if(!currentResult) renderQuiz();
+};
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->

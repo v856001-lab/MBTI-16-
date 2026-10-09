@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>九型人格簡易測驗</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui, sans-serif;margin:0;padding:0;}
+body{background:#f4f7fa;color:#222;line-height:1.6;padding:16px;max-width:900px;margin:0 auto;}
+header{text-align:center;margin-bottom:24px;}
+h1{color:#334155;font-size:26px;margin-bottom:6px;}
+.desc{color:#64748b;margin-bottom:16px;}
+.box{background:#fff;padding:24px;border-radius:16px;box-shadow:0 4px 12px #00000010;margin-bottom:20px;}
+.question{margin-bottom:24px;}
+.q-title{font-weight:500;margin-bottom:10px;}
+.opt-group{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.opt{padding:8px 4px;border:1px solid #cbd5e1;border-radius:8px;text-align:center;cursor:pointer;font-size:14px;transition:0.2s;}
+.opt:hover{background:#f1f5f9;}
+.opt.selected{background:#2563eb;color:#fff;border-color:#2563eb;}
+button{width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:16px;cursor:pointer;margin-top:10px;}
+button:disabled{background:#94a3b8;cursor:not-allowed;}
+.secondary-btn{background:#64748b;margin-top:8px;}
+.share-link-area{margin-top:16px;}
+#shareUrl{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin:8px 0;}
+.copy-tip{color:#22c55e;font-size:14px;display:none;}
+.result-area{margin:20px 0;min-height:120px;padding:16px;background:#f8fafc;border-radius:10px;}
+@media(max-width:640px){.opt-group{grid-template-columns:1fr 1fr;gap:8px;}}
+@media print {
+  body {background:#fff;}
+  button, .share-link-area {display:none !important;}
+  .box {box-shadow:none; padding:0;}
+  .opt-group{display:none !important;}
+  .question{display:none !important;}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>九型人格簡易測驗</h1>
+<p class="desc">快速測驗你的九型人格類型｜結果可列印與分享</p>
+</header>
+<div class="box">
+  <div id="gameArea">
+    <div id="questionsWrap"></div>
+    <button id="submitBtn" disabled>計算結果</button>
+  </div>
+  <div class="result-area" id="resultBox" style="display:none;">
+    <h3>你的九型人格測驗結果</h3>
+    <div id="resultText"></div>
+  </div>
+  <button id="printBtn">🖨️ 列印報告 / 另存PDF</button>
+  <div class="share-link-area">
+    <p>🔗 分享結果連結</p>
+    <input id="shareUrl" readonly>
+    <button id="copyLinkBtn" class="secondary-btn">複製連結</button>
+    <div class="copy-tip" id="copyTip">✅ 已複製到剪貼簿</div>
+  </div>
+  <button id="restartBtn">重新測驗</button>
+</div>
+<script>
+const printBtn = document.getElementById('printBtn');
+const shareUrlInput = document.getElementById('shareUrl');
+const copyLinkBtn = document.getElementById('copyLinkBtn');
+const copyTip = document.getElementById('copyTip');
+const restartBtn = document.getElementById('restartBtn');
+const resultBox = document.getElementById('resultBox');
+const resultText = document.getElementById('resultText');
+const questionsWrap = document.getElementById('questionsWrap');
+const submitBtn = document.getElementById('submitBtn');
+
+let currentResult = null;
+let answers = [];
+const optLabels = ["非常不符合","有點不符合","中立","有點符合","非常符合"];
+const optValues = [1,2,3,4,5];
+const questions = [
+  {q:"我習慣檢查事情是否正確，希望一切完美",type:"1"},
+  {q:"我很願意幫助別人，期待被他人需要",type:"2"},
+  {q:"我希望被肯定，習慣追求成就與認同",type:"3"},
+  {q:"我容易感受到情緒，喜歡獨特、有深度的事物",type:"4"},
+  {q:"我喜歡獨自思考，節省精力，不愛過多社交",type:"5"},
+  {q:"我容易擔心風險，尋找安全感與可靠夥伴",type:"6"},
+  {q:"我喜歡新奇體驗，討厭被束縛、悶悶無趣",type:"7"},
+  {q:"我習慣直接表達，不怕衝突，想要掌控局面",type:"8"},
+  {q:"我不喜歡爭執，習慣順從、維持平靜",type:"9"},
+];
+const typeInfo = {
+  "1":"#1 完美型｜講求原則、追求正確，對自己與他人標準高。優點：負責守規；盲點：容易挑剔、內在批判。",
+  "2":"#2 助人型｜善於察覺他人需求，樂於付出，渴望被喜愛。優點：溫暖體貼；盲點：容易犧牲自我、尋求認可。",
+  "3":"#3 成就型｜目標導向、自信，在意形象與成果。優點：行動力強；盲點：容易活在他人眼光，忽略內心感受。",
+  "4":"#4 自我型｜感受敏銳，追求獨特與真實情感。優點：共情力強；盲點：容易沉溺情緒，覺得自己與眾不同。",
+  "5":"#5 理智型｜愛學習、觀察，節省能量，保留個人空間。優點：邏輯清晰；盲點：容易抽離人際，過度孤立。",
+  "6":"#6 忠誠型｜謹慎小心，重視安全，尋找可靠的依託。優點：忠誠負責；盲點：容易焦慮，懷疑不確定事物。",
+  "7":"#7 活躍型｜樂觀好奇，喜歡新體驗，逃避痛苦壓力。優點：充滿活力；盲點：難堅持長期枯燥任務。",
+  "8":"#8 領袖型｜果斷直接，保護弱者，不畏衝突。優點：勇敢有擔當；盲點：容易強勢，忽略他人感受。",
+  "9":"#9 和諧型｜愛和平，不喜衝突，容易妥協配合。優點：包容溫和；盲點：容易忽略自身需求，拖延重要決定。",
+};
+
+// 列印
+printBtn.onclick = ()=> window.print();
+// 複製連結
+copyLinkBtn.onclick = async ()=>{
+  await navigator.clipboard.writeText(shareUrlInput.value);
+  copyTip.style.display = "block";
+  setTimeout(()=>copyTip.style.display="none",2000);
+};
+// 產生分享URL
+function buildShareUrl(res){
+  const payload = btoa(JSON.stringify(res));
+  const url = `${location.origin}${location.pathname}?r=${payload}`;
+  shareUrlInput.value = url;
+}
+// 從URL載入分享結果
+function loadFromUrlParam(){
+  const params = new URLSearchParams(location.search);
+  const dataStr = params.get("r");
+  if(!dataStr) return;
+  try{
+    const json = JSON.parse(atob(dataStr));
+    renderResult(json);
+  }catch(e){console.log("無效連結");}
+}
+// 渲染結果
+function renderResult(res){
+  currentResult = res;
+  resultBox.style.display="block";
+  resultText.innerHTML = res.html;
+  buildShareUrl(res);
+}
+// 渲染題目
+function renderQuiz(){
+  questionsWrap.innerHTML = '';
+  answers = Array(questions.length).fill(null);
+  questions.forEach((item, idx)=>{
+    const div = document.createElement('div');
+    div.className = 'question';
+    div.innerHTML = `<div class="q-title">${idx+1}. ${item.q}</div>`;
+    const optWrap = document.createElement('div');
+    optWrap.className = 'opt-group';
+    optValues.forEach((score, oIdx)=>{
+      const optEl = document.createElement('div');
+      optEl.className = 'opt';
+      optEl.textContent = optLabels[oIdx];
+      optEl.dataset.idx = idx;
+      optEl.dataset.val = score;
+      optEl.onclick = ()=>{
+        document.querySelectorAll(`.opt[data-idx="${idx}"]`).forEach(e=>e.classList.remove('selected'));
+        optEl.classList.add('selected');
+        answers[idx] = Number(optEl.dataset.val);
+        submitBtn.disabled = answers.some(v=>v===null);
+      };
+      optWrap.appendChild(optEl);
+    });
+    div.appendChild(optWrap);
+    questionsWrap.appendChild(div);
+  });
+  submitBtn.disabled = true;
+}
+// 計算分數
+function calcScore(){
+  const score = {"1":0,"2":0,"3":0,"4":0,"5":0,"6":0,"7":0,"8":0,"9":0};
+  questions.forEach((q,idx)=>{score[q.type] += answers[idx];});
+  let maxType = Object.entries(score).sort((a,b)=>b[1]-a[1])[0][0];
+  const html = `<p><strong>你的九型人格：${typeInfo[maxType]}</strong></p><p>備註：本測驗為簡易娛樂版，不做專業心理評估。</p>`;
+  return {html};
+}
+submitBtn.onclick = ()=>{renderResult(calcScore());};
+restartBtn.onclick = ()=>{
+  resultBox.style.display="none";
+  history.replaceState({}, document.title, location.pathname);
+  renderQuiz();
+};
+window.onload = ()=>{
+  loadFromUrlParam();
+  if(!currentResult) renderQuiz();
+};
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->
